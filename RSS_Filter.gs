@@ -7,13 +7,17 @@
  */
 function getXml() {
   var sheet = SpreadsheetApp.getActiveSheet();
-  sheet.clear();
   
   var url = 'http://rss.golem.de/rss.php?feed=RSS2.0';
-  var xml = UrlFetchApp.fetch(url).getContentText();
+  try {
+    var xml = UrlFetchApp.fetch(url).getContentText();
+  } catch(e) {
+    return;  
+  }
   var document = XmlService.parse(xml);
   var root = document.getRootElement();
 
+  sheet.clear();
   var channel = document.getRootElement().getChildren('channel');
   var item = channel[0].getChildren('item');
   var j = 0;
