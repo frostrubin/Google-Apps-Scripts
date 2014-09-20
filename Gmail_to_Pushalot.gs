@@ -4,7 +4,11 @@
  */
 function getMail() {
   // Create our top objects to contain a list of all known Mails
-  var InboxMails = getUnreadMailsForThreads(GmailApp.getInboxThreads());
+  try {
+    var InboxMails = getUnreadMailsForThreads(GmailApp.getInboxThreads());
+  } catch(e) {
+    return;
+  } 
   
   // Read the Spreadsheet to get a list of all known mails
   var ss = SpreadsheetApp.getActiveSheet();
@@ -37,7 +41,7 @@ function getMail() {
       
       // Set Push Notification Default Parameters
       var Pushalot = new Object;
-      Pushalot.AuthorizationToken = '07881611bd0de98ed8ab459eaa463dbb';
+      Pushalot.AuthorizationToken = '26exampletoken';
       Pushalot.Title = InboxMails[i].Subject; //Required
       Pushalot.Body  = 'Email from ' + name;  //Required
       Pushalot.IsImportant = false;
@@ -131,7 +135,8 @@ function getMail() {
   var values = [];
   for (var i in KnownMails) {
     values[count] = [];
-    values[count][0] = KnownMails[i].msgID;     //Fill Column A
+  //  values[count][0] = KnownMails[i].msgID;     //Fill Column A
+    values[count][0] = Utilities.base64Encode(Utilities.newBlob(KnownMails[i].msgID).getBytes());
     values[count][1] = KnownMails[i].Subject;   //Fill Column B
     values[count][2] = KnownMails[i].PushResult //Fill Column C
     count++; // = count + 1;
@@ -200,6 +205,7 @@ function getMailIdsFromSpreadsheet(sheet) {
     for (var i = 0; i < values.length; i++) {
       var message = new Object;
       message.msgID = values[i][0];
+      message.msgID = Utilities.newBlob(Utilities.base64Decode(message.msgID, Utilities.Charset.UTF_8)).getDataAsString();
       message.Subject = values[i][1];
       message.PushResult = values[i][2];
       knownMails[message.msgID] = message;
