@@ -1,4 +1,16 @@
+/**
+ * @OnlyCurrentDoc
+ */
 function getWeatherWarnings() {
+
+  // Layout of the Excel File:
+  // A         B                      C   D    E
+  // Pflanzung Temperaturbereich               Wednesday May 17 2017 15:33:10
+  // Erdbeeren                18     38        Es lagen keine Warnungen vor
+  // Lavendel                 -6     40    
+  // Rosmarin                 -6     40    
+  // Tomaten                   4     38
+
   var WOEID = '12597040'; //Offenbach, Germany
   var Weather = [];
   var Warnings = [];
