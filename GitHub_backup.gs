@@ -20,9 +20,10 @@ function gitBackup() {
       
       // Find the corresponding old file and delete it
       var files = folder.getFiles();
-      for (var k in files) {
-        if ( files[k].getName() == blob.getName() ) {
-          files[k].setTrashed(true); 
+      while (files.hasNext()) {
+        var file = files.next();
+        if ( file.getName() == blob.getName() ) {
+          file.setTrashed(true);  
         }
       }
       
@@ -83,9 +84,9 @@ function getRepoBranches(username, reponame) {
 
 function getBackupFolder(foldername) {
   try {
-    var folder = DocsList.getFolder(foldername);
+    var folder = DriveApp.getFoldersByName(foldername).next();
   } catch(err) {
-    var folder = DocsList.createFolder(foldername);
+    var folder = DriveApp.createFolder(foldername);
   }
   return folder;
 }
