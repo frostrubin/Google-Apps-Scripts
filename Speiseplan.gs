@@ -1,3 +1,6 @@
+/**
+ * @OnlyCurrentDoc
+ */
 function getSpeiseplanData() {
   var planBlob = downloadSpeiseplan();
   //var planBlob = DriveApp.getFilesByName('loc40.pdf').next().getBlob();
@@ -32,10 +35,11 @@ function getTagesGerichte(text) {
   var str = ''; // Um String zu deklarieren
   str = text;
   
-  var split = str.split('Euro');
+  var split = [];
+  split = str.split('Euro');
   for (var i=0; i < split.length; i++) {
     str = split[i];
-    // Alle Zahlen, Punkte, Kommas löschen, Trimmen
+    // Alle Zahlen, Punkte, Kommas löschen, das Wort "Euro" löschen, Trimmen
     str = str.replace(', je ','').replace(/[0-9]/g,'').replace(/,/g,'').replace(/\./g,'').trim();
     // Wochentage löschen
     str = str.replace('Montag der ','').replace('Dienstag der ','').replace('Mittwoch der ','');
@@ -49,6 +53,8 @@ function getTagesGerichte(text) {
     str = str.replace('Pizzatag','').replace('Schnitzeltag','').replace('Currywursttag','');
     str = str.replace('Loc ','').replace('Daimlerstraße ','').replace(' Frankfurt','').replace('= leicht','');
     str = str.replace('Campus','').replace('Oberhafen','').replace('Gebäude','');
+    str = str.replace('(Schwein I Rind)','');
+    str = str.replace(' I ',',').replace(' l ',',');     
     // Doppelte Leerzeichen & Zeilenumbrüche entfernen, trimmen
     str = str.replace('- ','').replace('=','').replace(/\s\s+/g,' ').trim();
     if (str.substr(str.length - 4) == ' I I') {
@@ -78,22 +84,16 @@ function sendToPushalot(gerichte) {
     text = text + 'Gericht ' + c + ': ' + gerichte[i]; 
   }
   
-  var Pushalot = new Object;
-  Pushalot.AuthorizationToken = '4711';
-  Pushalot.Title = 'Mittagessen'; //Required
-  Pushalot.Body  = text;          //Required
-  Pushalot.IsImportant = true;
-  Pushalot.IsSilent    = false;
-  Pushalot.Image       = 'http://chip03.chipimages.de/crawler-mq/gplay/15/27/77/73/99/com.yayaapps.imhungry/ee880f16fd5a8461accacc77e6bf9300';
-  Pushalot.Source      = 'Speiseplan';
-  Pushalot.TimeToLive  = 120; // 120 min
-  // Send Push Notification
-  var payload = JSON.stringify(Pushalot); 
+  var Notification = new Object;
+  //Notification.Subject = 'Mittagessen';
+  Notification.Body    = text;
+  var payload = JSON.stringify(Notification); 
   var headers = {
     'Content-Type': 'application/json'
   };
-  var url = 'https://pushalot.com/api/sendmessage';
+  var url = 'https://the-api.com/lunch';
   var options = {
+    'method': 'post',
     'muteHttpExceptions': true,
     'headers': headers,
     'payload': payload
