@@ -1,8 +1,11 @@
 /**
+ * @OnlyCurrentDoc
+ */
+/**
  * Looks for new Mails, stores mail IDs in spreadsheet,
  * sends notifications via Pushalot
  */
-function getMail() {
+function getMail() {  
   // Create our top objects to contain a list of all known Mails
   try {
     var InboxMails = getUnreadMailsForThreads(GmailApp.getInboxThreads());
@@ -11,8 +14,12 @@ function getMail() {
   } 
   
   // Read the Spreadsheet to get a list of all known mails
-  var ss = SpreadsheetApp.getActiveSheet();
-  var KnownMails = getMailIdsFromSpreadsheet(ss);
+  try {
+    var ss = SpreadsheetApp.getActiveSheet();
+    var KnownMails = getMailIdsFromSpreadsheet(ss);
+  } catch(e) {
+    return;
+  } 
     
   // Determine which mails are new
   for (var i in InboxMails) {
@@ -20,112 +27,73 @@ function getMail() {
       // Add Email to the list of known Mails
       KnownMails[InboxMails[i].msgID] = InboxMails[i];
       
-      // Try to get the Sender Name via Contact
+      // Do we need to run?
+      try {
+        switch(KnownMails[InboxMails[i].msgID].SenderMail.toLowerCase()) {
+          case 'abc@example.com':
+            throw 'Off';
+          case 'xyz@hardcoded.com':
+            throw 'Off';
+          case 'calendar-notification@google.com':
+            throw 'Off';
+        }
+      } catch(e) {
+        KnownMails[InboxMails[i].msgID].PushResult = 'Push is off for this contact';
+        continue;
+      }
+      
+      var Notification = new Object;
+      // Sender
+      Notification.Sender = KnownMails[InboxMails[i].msgID].SenderMail;
+      // Sender Name
+      Notification.SenderName = InboxMails[i].SenderName;
       var contact = ContactsApp.getContact(InboxMails[i].SenderMail);
       if (contact != null ) {
-        var name = contact.getFullName();
-      } else {
-        var name = InboxMails[i].SenderName;
+        Notification.SenderName = contact.getFullName();
       }
-      
-      // Try to get Pushalot Settings from a Contact
-      var parameters = new Object;
-      if (contact != null ) {
-        var fields = contact.getCustomFields();
-        for (var j in fields) {
-          if (fields[j].getLabel() == 'Pushalot') {
-            parameters = JSON.parse(fields[j].getValue()); 
-          }
-        }
-      }
-      
-      // Set Push Notification Default Parameters
-      var Pushalot = new Object;
-      Pushalot.AuthorizationToken = '26exampletoken';
-      Pushalot.Title = InboxMails[i].Subject; //Required
-      Pushalot.Body  = 'Email from ' + name;  //Required
-      Pushalot.IsImportant = false;
-      Pushalot.IsSilent    = false;
-      Pushalot.Image       = 'http://bitnugget.de/pushalot/gmail.png';
-      Pushalot.Source      = name;
-      Pushalot.TimeToLive  = 1440; // One day
-      Pushalot.Link        = 'mailto:' + KnownMails[InboxMails[i].msgID].SenderMail;
-      Pushalot.LinkTitle   = 'Send Email';
-      
-      if (! ( parameters.Off != null ) ) {
-        // Overwrite Parameters if applicable
-        if ( parameters.IsImportant != null ) {
-          Pushalot.IsImportant = parameters.IsImportant; 
-        }
-        if ( parameters.IsSilent != null ) {
-          Pushalot.IsSilent    = parameters.IsSilent; 
-        }
-        if ( parameters.Image != null ) {
-          Pushalot.Image       = parameters.Image; 
-        }
-        if ( parameters.Source != null ) {
-          Pushalot.Source      = parameters.Source; 
-        }
-        if ( parameters.TimeToLive != null ) {
-          Pushalot.TimeToLive  = parameters.TimeToLive; 
-        }
-        
-        // Special Treatment for FritzBox based messages
-        if (name == 'FRITZ!Box') {
+      // Content
+      Notification.Body = InboxMails[i].Subject.replace(/ +(?= )/g,'').trim(); // Remove Double Spaces and Trim;
+      if (Notification.Body == '') {
+        Notification.Body = 'No Subject'; 
+      }      
+  
+      // Special Treatment for FritzBox based messages
+      if (Notification.SenderName == 'FRITZ!Box') {
+        try {
           var plain = GmailApp.getMessageById(InboxMails[i].msgID).getPlainBody();
           var partial = plain.replace( /^\D+/g, '');
           var telno = partial.substring(0, partial.indexOf(' '));
-          if (telno != null) {
-            Pushalot.Link = 'tel:' + telno;
-            Pushalot.LinkTitle = telno;
-            Pushalot.Body = InboxMails[i].Subject;
-          }
+          Notification.Sender = telno;
+        } catch(e) {
+          //Nothing. In edge cases we can live without the telno
         }
-        
-        //Special Treatment for FullBodyForward
-        if ( parameters.FullBodyForward != null ) {
-          Pushalot.Body = GmailApp.getMessageById(InboxMails[i].msgID).getPlainBody(); 
-        }
-        
-        // Final Cleanup
-        Pushalot.Source = Pushalot.Source.substring(0, 24)
-        
-        // Send Push Notification
-        var payload = JSON.stringify(Pushalot); 
-        var headers = {
-          'Content-Type': 'application/json'
-        };
-        var url = 'https://pushalot.com/api/sendmessage';
-        var options = {
-          'muteHttpExceptions': true,
-          'headers': headers,
-          'payload': payload
-        };
-        var response = UrlFetchApp.fetch(url, options);
-        Logger.log(response);
-        var result = '';
-        switch(response.getResponseCode()) {
-          case 200:
-            result = 'OK'; break;
-          case 400:
-            result = 'Bad Request'; break;
-          case 405:
-            result = 'Method not allowed (POST required)'; break;
-          case 406:
-            result = 'Message Throttle Limit hit'; break;
-          case 410:
-            result = 'Auth Token not valid'; break;
-          case 500:
-            result = 'Problem at Pushalots Side'; break;
-          case 503:
-            result = 'Pushalot Server not available'; break;
-        }       
-        
-        // Store result
-        KnownMails[InboxMails[i].msgID].PushResult = response.getResponseCode() + ' ' + result;
-      } else {
-        KnownMails[InboxMails[i].msgID].PushResult = 'Push is off for this contact';
-      }
+      }     
+            
+      // Send Push Notification
+      var payload = JSON.stringify(Notification);
+      var headers = {
+        'Content-Type': 'application/json'
+      };
+      var url = 'https://your-endpoint.com/v3/email';
+      var options = {
+        'method': 'post',
+        'muteHttpExceptions': true,
+        'headers': headers,
+        'payload': payload
+      };
+      var response = UrlFetchApp.fetch(url, options);
+      Logger.log(response);
+      var result = '';
+      var code = response.getResponseCode();
+      switch(code) {
+        case 200:
+          result = 'OK'; break;
+        default:
+          result = 'Error';
+      }       
+      
+      // Store result
+      KnownMails[InboxMails[i].msgID].PushResult = code + ' ' + result;
     }
   }
   
@@ -142,12 +110,14 @@ function getMail() {
     count++; // = count + 1;
   }
   ss.clear();
-  ss.getRange(rangeTxt).setValues(values);
+  if (values.length > 0) {
+    ss.getRange(rangeTxt).setValues(values);
+  }
   
   // Commit date and time of last update into extra cell
   ss.getRange("D1").setValue(date_time());
   // And beautify the Spreadsheet
-  for (var i = 1; i <= ss.getLastColumn(); i++) {
+  for (var i = 1; i < ss.getLastColumn(); i++) {
     ss.autoResizeColumn(i);
   }
   // And finally flush
